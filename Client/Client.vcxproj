@@ -18,21 +18,11 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\..\..\..\..\..\Dean%27s\Documents\Visual Studio 2015\Projects\OperatingSystemsCourse\group26_ex4\group26_ex4\main.c" />
-    <ClCompile Include="..\..\..\..\..\..\..\Dean%27s\Documents\Visual Studio 2015\Projects\OperatingSystemsCourse\group26_ex4\group26_ex4\server.c" />
-    <ClCompile Include="..\..\..\..\..\..\..\Dean%27s\Documents\Visual Studio 2015\Projects\OperatingSystemsCourse\group26_ex4\group26_ex4\socket.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\..\..\..\..\..\Dean%27s\Documents\Visual Studio 2015\Projects\OperatingSystemsCourse\group26_ex4\group26_ex4\server.h" />
-    <ClInclude Include="..\..\..\..\..\..\..\Dean%27s\Documents\Visual Studio 2015\Projects\OperatingSystemsCourse\group26_ex4\group26_ex4\socket.h" />
-  </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{33401AF3-87F3-4689-B045-31948F691B61}</ProjectGuid>
+    <ProjectGuid>{D13AE030-C1D0-4F9E-8236-1D7770D0F1F6}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>group26_ex4</RootNamespace>
+    <RootNamespace>Client</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
-    <ProjectName>Server</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -155,6 +145,13 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\..\..\..\..\Dean%27s\Documents\Visual Studio 2015\Projects\OperatingSystemsCourse\group26_ex4\Client\client.c" />
+    <ClCompile Include="..\..\..\..\..\..\..\Dean%27s\Documents\Visual Studio 2015\Projects\OperatingSystemsCourse\group26_ex4\Client\main.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\..\..\..\Dean%27s\Documents\Visual Studio 2015\Projects\OperatingSystemsCourse\group26_ex4\Client\client.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
