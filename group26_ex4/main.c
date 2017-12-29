@@ -10,10 +10,6 @@ int main(int argc, char *argv[]) {
 	InitServer(argv);
 	HandleServer();
 	CloseSocketsAndThreads();
-	if (WSACleanup() == SOCKET_ERROR) {
-		printf("Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
-		exit(ERROR_CODE);
-		// todo verify
-	}
+	
 	return SUCCESS_CODE;
 }

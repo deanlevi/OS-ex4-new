@@ -1,9 +1,8 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#include "socket.h"
+#include "../Shared/socket.h" // todo
 
-#define SUCCESS_CODE (int)(0) // todo move to shared
 #define SERVER_ADDRESS_STR "127.0.0.1" // todo move to shared
 #define NUMBER_OF_CLIENTS 2
 #define NUMBER_OF_GAMES 1 // todo
