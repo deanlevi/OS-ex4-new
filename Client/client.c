@@ -11,8 +11,11 @@ void HandleClient();
 void ConnectToServer();
 void CreateThreadsAndSemaphores();
 void WINAPI SendThread();
+void HandleNewUserRequest();
 void WINAPI ReceiveThread();
+void HandleNewUserAccept();
 void ParseNewUserAccept(char *ReceivedData);
+void HandleReceivedData(char *ReceivedData);
 void WINAPI UserInterfaceThread();
 void CloseSocketAndThreads();
 
@@ -50,9 +53,9 @@ void HandleClient() {
 
 	wait_code = WaitForMultipleObjects(NUMBER_OF_THREADS_TO_HANDLE_CLIENT, Client.ThreadHandles, TRUE, INFINITE); // todo check INFINITE
 	if (WAIT_OBJECT_0 != wait_code) {
-OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Custom message: Error when waiting for program to end.\n");
-CloseSocketAndThreads(); // todo add/check print
-exit(ERROR_CODE);
+		OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Custom message: Error when waiting for program to end.\n");
+		CloseSocketAndThreads(); // todo add/check print
+		exit(ERROR_CODE);
 	}
 }
 
@@ -112,6 +115,13 @@ void CreateThreadsAndSemaphores() {
 }
 
 void WINAPI SendThread() {
+	HandleNewUserRequest();
+	while (TRUE) {
+		break; // todo remove
+	}
+}
+
+void HandleNewUserRequest() {
 	char NewUserRequest[MESSAGE_LENGTH];
 	int SendDataToServerReturnValue;
 	sprintf(NewUserRequest, "NEW_USER_REQUEST:%s\n", Client.UserName);
@@ -129,19 +139,29 @@ void WINAPI SendThread() {
 		CloseSocketAndThreads(); // todo check if add function to handle error
 		exit(ERROR_CODE);
 	}
-	while (TRUE) {
-		break; // todo remove
-	}
 }
 
 void WINAPI ReceiveThread() {
-	DWORD wait_code;
-	wait_code = WaitForSingleObject(Client.ReceiveDataSemaphore, INFINITE); // wait for signal
+	HandleNewUserAccept();
+
+	while (TRUE) {
+		char *ReceivedData = ReceiveData(Client.Socket, Client.LogFilePtr);
+		if (ReceivedData == NULL) {
+			CloseSocketAndThreads();
+			exit(ERROR_CODE);
+		}
+		HandleReceivedData(ReceivedData);
+	}
+}
+
+void HandleNewUserAccept() {
+	/*DWORD wait_code;
+		wait_code = WaitForSingleObject(Client.ReceiveDataSemaphore, INFINITE); // wait for signal // todo check if needed
 	if (WAIT_OBJECT_0 != wait_code) {
 		OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Custom message: Error when waiting for ReceiveData semaphore.\n");
 		CloseSocketAndThreads();
 		exit(ERROR_CODE);
-	}
+	}*/
 	char *ReceivedData = ReceiveData(Client.Socket, Client.LogFilePtr);
 	if (ReceivedData == NULL) {
 		CloseSocketAndThreads();
@@ -152,23 +172,14 @@ void WINAPI ReceiveThread() {
 	char PlayerType = Client.PlayerType == X ? 'x' : 'o';
 	sprintf(TempMessage, "Custom message: %s received NEW_USER_ACCEPTED from Server. PlayerType is %c.\n", Client.UserName, PlayerType);
 	OutputMessageToWindowAndLogFile(Client.LogFilePtr, TempMessage);
-
-	while (TRUE) {
-		break; // todo remove
-	}
 }
 
 void ParseNewUserAccept(char *ReceivedData) {
-	int StartPosition = 0;
-	int EndPosition = 0;
-	int ParameterSize;
-	while (ReceivedData[EndPosition] != ':') { // assuming valid input
-		EndPosition++;
-	}
-	ParameterSize = (EndPosition - 1) - StartPosition + 1;
-	if (strncmp(ReceiveData, "NEW_USER_DECLINED", ParameterSize) == 0 || strncmp(ReceiveData, "NEW_USER_ACCEPTED", ParameterSize) != 0) {
-		if (strncmp(ReceiveData, "NEW_USER_DECLINED", ParameterSize) == 0) {
-			OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Custom message: Got NEW_USER_DECLINED from Server. Exiting...\n");
+	int NewUserMessageOffset = 17; // size of "NEW_USER_DECLINED" / "NEW_USER_ACCEPTED"
+	if (strncmp(ReceivedData, "NEW_USER_DECLINED", NewUserMessageOffset) == 0 ||
+		strncmp(ReceivedData, "NEW_USER_ACCEPTED", NewUserMessageOffset) != 0) {
+		if (strncmp(ReceivedData, "NEW_USER_DECLINED", NewUserMessageOffset) == 0) {
+			OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Request to join was refused.\n");
 		}
 		else {
 			OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Custom message: Got unexpected answer from Server. Exiting...\n");
@@ -177,13 +188,10 @@ void ParseNewUserAccept(char *ReceivedData) {
 		CloseSocketAndThreads();
 		exit(ERROR_CODE);
 	}
-	OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Custom message: Got NEW_USER_ACCEPTED from Server.\n");
-	EndPosition++;
-	StartPosition = EndPosition;
-	ParameterSize = EndPosition - StartPosition + 1; // = 1. expecting 'x' or 'o'
-	if (strncmp(ReceivedData + StartPosition, "x", ParameterSize) == 0) {
+	NewUserMessageOffset += 1;
+	if (strncmp(ReceivedData + NewUserMessageOffset, "x", 1) == 0) {
 		Client.PlayerType = X;
-	} else if (strncmp(ReceivedData + StartPosition, "o", ParameterSize) == 0) {
+	} else if (strncmp(ReceivedData + NewUserMessageOffset, "o", 1) == 0) {
 		Client.PlayerType = O;
 	}
 	else {
@@ -194,6 +202,10 @@ void ParseNewUserAccept(char *ReceivedData) {
 	}
 	// todo check if need to parse player number. 1/2.
 	free(ReceivedData);
+}
+
+void HandleReceivedData(char *ReceivedData) {
+
 }
 
 void WINAPI UserInterfaceThread() {

@@ -20,7 +20,7 @@ void InitWsaData() {
 	int StartupRes = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
 	if (StartupRes != NO_ERROR) {
-		printf("Error %ld at WSAStartup().\nExiting...\n", StartupRes);
+		printf("Custom message: Error %ld at WSAStartup().\nExiting...\n", StartupRes);
 		// Tell the user that we could not find a usable WinSock DLL.
 		exit(ERROR_CODE); // todo handle error
 	}
@@ -29,7 +29,7 @@ void InitWsaData() {
 void InitLogFile(char *LogFilePathPtr) {
 	FILE *LogFilePointer = fopen(LogFilePathPtr, "w");
 	if (LogFilePointer == NULL) {
-		printf("Couldn't open log file.\n");
+		printf("Custom message: Couldn't open log file.\n");
 		exit(ERROR_CODE);
 	}
 	fclose(LogFilePointer);
@@ -43,7 +43,7 @@ void OutputMessageToWindowAndLogFile(char *LogFilePathPtr, char *MessageToWrite)
 void WriteToLogFile(char *LogFilePathPtr, char *MessageToWrite) { // todo check all calls to this function
 	FILE *LogFilePointer = fopen(LogFilePathPtr, "a");
 	if (LogFilePointer == NULL) {
-		printf("Couldn't open log file.\n");
+		printf("Custom message: Couldn't open log file.\n");
 		exit(ERROR_CODE);
 	}
 	fputs(MessageToWrite, LogFilePointer);
@@ -55,12 +55,12 @@ HANDLE CreateThreadSimple(LPTHREAD_START_ROUTINE p_start_routine, LPVOID p_threa
 	HANDLE thread_handle;
 
 	if (NULL == p_start_routine) {
-		OutputMessageToWindowAndLogFile(LogFilePathPtr, "Error when creating a thread. Received null pointer.\n");
+		OutputMessageToWindowAndLogFile(LogFilePathPtr, "Custom message: Error when creating a thread. Received null pointer.\n");
 		return NULL;
 	}
 
 	if (NULL == p_thread_id) {
-		OutputMessageToWindowAndLogFile(LogFilePathPtr, "Error when creating a thread. Received null pointer.\n");
+		OutputMessageToWindowAndLogFile(LogFilePathPtr, "Custom message: Error when creating a thread. Received null pointer.\n");
 		return NULL;
 	}
 
@@ -73,7 +73,7 @@ HANDLE CreateThreadSimple(LPTHREAD_START_ROUTINE p_start_routine, LPVOID p_threa
 		p_thread_id);        /*  returns the thread identifier */
 
 	if (NULL == thread_handle) {
-		OutputMessageToWindowAndLogFile(LogFilePathPtr, "Couldn't create thread.\n");
+		OutputMessageToWindowAndLogFile(LogFilePathPtr, "Custom message: Couldn't create thread.\n");
 		return NULL;
 	}
 
@@ -95,7 +95,7 @@ void CloseOneThreadHandle(HANDLE HandleToClose, char *LogFilePathPtr) {
 	if (HandleToClose != NULL) {
 		ret_val = CloseHandle(HandleToClose);
 		if (FALSE == ret_val) {
-			OutputMessageToWindowAndLogFile(LogFilePathPtr, "Error when closing threads.\n");
+			OutputMessageToWindowAndLogFile(LogFilePathPtr, "Custom message: Error when closing thread handle.\n");
 			exit(ERROR_CODE);
 		}
 	}
@@ -104,7 +104,7 @@ void CloseOneThreadHandle(HANDLE HandleToClose, char *LogFilePathPtr) {
 void CloseWsaData(char *LogFilePathPtr) {
 	if (WSACleanup() == SOCKET_ERROR) {
 		char ErrorMessage[MESSAGE_LENGTH];
-		sprintf(ErrorMessage, "Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
+		sprintf(ErrorMessage, "Custom message: Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
 		OutputMessageToWindowAndLogFile(ErrorMessage, LogFilePathPtr);
 		exit(ERROR_CODE);
 	}

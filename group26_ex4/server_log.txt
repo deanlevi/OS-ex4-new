@@ -1,2 +1,4 @@
 Custom message: Received NEW_USER_REQUEST from Client 0, UserName isp_student.
 Custom message: Sent NEW_USER_ACCEPTED to Client 0, UserName isp_student.
+Custom message: Received NEW_USER_REQUEST from Client 1, UserName isp_student.
+Custom message: Sent NEW_USER_DECLINED to Client 1, UserName isp_student.

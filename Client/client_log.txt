@@ -1,2 +1,3 @@
 Connected to server on 127.0.0.1:8888.
 Custom message: Sent NEW_USER_REQUEST to Server. UserName isp_student.
+Request to join was refused.
