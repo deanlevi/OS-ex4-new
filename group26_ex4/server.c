@@ -13,7 +13,7 @@ void CreateSocketBindAndListen();
 void SetSockAddrInAndBind();
 void SetSocketToListen();
 void HandleConnectToClients();
-void WINAPI ConnectToClientsThread();
+void WINAPI ConnectToClientsThread(LPVOID lpParam);
 void InitBoard();
 void WINAPI TicTacToeGameThread(LPVOID lpParam);
 bool HandleNewUserRequestAndAccept(int ClientIndex);
@@ -24,6 +24,9 @@ void SignalGameStarted();
 void SendGameStartedBoardViewAndTurnSwitch(int ClientIndex);
 void SendBoardView(int ClientIndex);
 void SendTurnSwitch(int ClientIndex);
+void HandleReceivedData(char *ReceivedData, int ClientIndex);
+void HandlePlayRequest(char *ReceivedData);
+void HandleUserListQuery();
 void CloseSocketsAndThreads();
 
 void InitServer(char *argv[]) {
@@ -45,7 +48,7 @@ void InitServer(char *argv[]) {
 		1,		/* Maximum Count */
 		NULL);	/* un-named */
 	if (Server.GameStartedSemaphore == NULL) {
-		OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Error when creating GameStarted semaphore.\n");
+		WriteToLogFile(Server.LogFilePtr, "Custom message: Error when creating GameStarted semaphore.\n");
 		exit(ERROR_CODE);
 	}
 	Server.NumberOfConnectedUsersSemaphore = CreateSemaphore(
@@ -54,7 +57,7 @@ void InitServer(char *argv[]) {
 		1,		/* Maximum Count */
 		NULL);	/* un-named */
 	if (Server.GameStartedSemaphore == NULL) {
-		OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Error when creating NumberOfConnectedUsers semaphore.\n");
+		WriteToLogFile(Server.LogFilePtr, "Custom message: Error when creating NumberOfConnectedUsers semaphore.\n");
 		exit(ERROR_CODE);
 	}
 	Server.NumberOfConnectedUsers = 0;
@@ -63,7 +66,7 @@ void InitServer(char *argv[]) {
 		FALSE,	/* initially not owned */
 		NULL);	/* unnamed mutex */
 	if (NULL == Server.NumberOfConnectedUsersMutex) {
-		OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Error when creating NumberOfConnectedUsers mutex.\n");
+		WriteToLogFile(Server.LogFilePtr, "Custom message: Error when creating NumberOfConnectedUsers mutex.\n");
 		exit(ERROR_CODE);
 	}
 	InitLogFile(Server.LogFilePtr);
@@ -81,7 +84,7 @@ void HandleServer() {
 
 		wait_code = WaitForMultipleObjects(NUMBER_OF_CLIENTS, Server.ClientsThreadHandle, TRUE, INFINITE); // todo check INFINITE
 		if (WAIT_OBJECT_0 != wait_code) {
-			OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Custom message: Error when waiting for program to end.\n");
+			WriteToLogFile(Server.LogFilePtr, "Custom message: Error when waiting for program to end.\n");
 			CloseSocketsAndThreads();
 			exit(ERROR_CODE);
 		}
@@ -94,7 +97,7 @@ void CreateSocketBindAndListen() {
 	if (Server.ListeningSocket == INVALID_SOCKET) {
 		char ErrorMessage[MESSAGE_LENGTH];
 		sprintf(ErrorMessage, "Custom message: CreateSocketBindAndListen failed to create socket. Error Number is %d\n", WSAGetLastError());
-		OutputMessageToWindowAndLogFile(Server.LogFilePtr, ErrorMessage);
+		WriteToLogFile(Server.LogFilePtr, ErrorMessage);
 		exit(ERROR_CODE);
 	}
 
@@ -122,7 +125,7 @@ void SetSocketToListen() {
 	if (ListenReturnValue != LISTEN_SUCCEEDED) {
 		char ErrorMessage[MESSAGE_LENGTH];
 		sprintf(ErrorMessage, "Custom message: SetSocketToListen failed to set Socket to listen. Error Number is %d\n", WSAGetLastError());
-		OutputMessageToWindowAndLogFile(Server.LogFilePtr, ErrorMessage);
+		WriteToLogFile(Server.LogFilePtr, ErrorMessage);
 		CloseSocketsAndThreads(); // todo add/check print
 		exit(ERROR_CODE);
 	}
@@ -159,7 +162,7 @@ void WINAPI ConnectToClientsThread(LPVOID lpParam) { // todo add support for mor
 		if (Server.ClientsSockets[*ClientIndex] == INVALID_SOCKET) {
 			char ErrorMessage[MESSAGE_LENGTH];
 			sprintf(ErrorMessage, "Custom message: ConnectToClients failed to accept. Error Number is %d\n", WSAGetLastError());
-			OutputMessageToWindowAndLogFile(Server.LogFilePtr, ErrorMessage);
+			WriteToLogFile(Server.LogFilePtr, ErrorMessage);
 			CloseSocketsAndThreads(); // todo add/check print
 			exit(ERROR_CODE);
 		}
@@ -174,7 +177,7 @@ void WINAPI ConnectToClientsThread(LPVOID lpParam) { // todo add support for mor
 		DWORD wait_code;
 		wait_code = WaitForSingleObject(Server.NumberOfConnectedUsersSemaphore, INFINITE); // wait for signal
 		if (WAIT_OBJECT_0 != wait_code) {
-			OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Custom message: Error when waiting for NumberOfConnectedUsers semaphore.\n");
+			WriteToLogFile(Server.LogFilePtr, "Custom message: Error when waiting for NumberOfConnectedUsers semaphore.\n");
 			CloseSocketsAndThreads(); // todo check how to handle error by instructions
 			exit(ERROR_CODE);
 		}
@@ -193,7 +196,7 @@ void InitBoard() {
 
 void WINAPI TicTacToeGameThread(LPVOID lpParam) {
 	if (NULL == lpParam) {
-		OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Custom message: Error in TicTacToeGame. Received null pointer.\n");
+		WriteToLogFile(Server.LogFilePtr, "Custom message: Error in TicTacToeGame. Received null pointer.\n");
 		CloseSocketsAndThreads(); // todo add/check print
 		exit(ERROR_CODE);
 	}
@@ -201,7 +204,7 @@ void WINAPI TicTacToeGameThread(LPVOID lpParam) {
 	bool UserWasAccepted = HandleNewUserRequestAndAccept(*ClientIndex);
 	if (!UserWasAccepted) {
 		if (ReleaseOneSemaphore(Server.NumberOfConnectedUsersSemaphore) == FALSE) { // to signal to ConnectUsersThread
-			OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Custom message: failed to release NumberOfConnectedUsers semaphore.\n");
+			WriteToLogFile(Server.LogFilePtr, "Custom message: failed to release NumberOfConnectedUsers semaphore.\n");
 			CloseSocketsAndThreads(); // todo check if add function to handle error
 			exit(ERROR_CODE);
 		}
@@ -209,6 +212,15 @@ void WINAPI TicTacToeGameThread(LPVOID lpParam) {
 	}
 	UpdateNumberOfConnectedUsersAndWaitForGameStart();
 	SendGameStartedBoardViewAndTurnSwitch(*ClientIndex);
+
+	while (TRUE) { // todo while !Server.GameEnded?
+		char *ReceivedData = ReceiveData(Server.ClientsSockets[*ClientIndex], Server.LogFilePtr);
+		if (ReceivedData == NULL) {
+			CloseSocketsAndThreads();
+			exit(ERROR_CODE);
+		}
+		HandleReceivedData(ReceivedData, *ClientIndex);
+	}
 }
 
 bool HandleNewUserRequestAndAccept(int ClientIndex) {
@@ -228,7 +240,7 @@ bool HandleNewUserRequestAndAccept(int ClientIndex) {
 		char TempMessage[MESSAGE_LENGTH];
 		sprintf(TempMessage, "Custom message: Sent NEW_USER_DECLINED to Client %d, UserName %s.\n",
 						      ClientIndex, Server.Players[ClientIndex].UserName);
-		OutputMessageToWindowAndLogFile(Server.LogFilePtr, TempMessage);
+		WriteToLogFile(Server.LogFilePtr, TempMessage);
 		return false;
 	}
 	else {
@@ -247,8 +259,8 @@ bool HandleNewUserRequestAndAccept(int ClientIndex) {
 		}
 		char TempMessage[MESSAGE_LENGTH];
 		sprintf(TempMessage, "Custom message: Sent NEW_USER_ACCEPTED to Client %d, UserName %s.\n",
-			ClientIndex, Server.Players[ClientIndex].UserName);
-		OutputMessageToWindowAndLogFile(Server.LogFilePtr, TempMessage);
+							  ClientIndex, Server.Players[ClientIndex].UserName);
+		WriteToLogFile(Server.LogFilePtr, TempMessage);
 		return true;
 	}
 	return true; // to remove warning
@@ -265,7 +277,7 @@ void ParseNewUserRequest(char *ReceivedData, int ClientIndex) {
 	if (strncmp(ReceivedData, "NEW_USER_REQUEST", ParameterSize) != 0) {
 		char ErrorMessage[MESSAGE_LENGTH];
 		sprintf(ErrorMessage, "Custom message: Got unexpected data from client number %d. Exiting...\n", ClientIndex);
-		OutputMessageToWindowAndLogFile(Server.LogFilePtr, ErrorMessage);
+		WriteToLogFile(Server.LogFilePtr, ErrorMessage);
 		free(ReceivedData);
 		CloseSocketsAndThreads();
 		exit(ERROR_CODE);
@@ -282,7 +294,7 @@ void ParseNewUserRequest(char *ReceivedData, int ClientIndex) {
 	char TempMessage[MESSAGE_LENGTH];
 	sprintf(TempMessage, "Custom message: Received NEW_USER_REQUEST from Client %d, UserName %s.\n",
 						  ClientIndex, Server.Players[ClientIndex].UserName);
-	OutputMessageToWindowAndLogFile(Server.LogFilePtr, TempMessage);
+	WriteToLogFile(Server.LogFilePtr, TempMessage);
 }
 
 void UpdateNumberOfConnectedUsersAndWaitForGameStart() {
@@ -291,13 +303,13 @@ void UpdateNumberOfConnectedUsersAndWaitForGameStart() {
 
 	wait_code = WaitForSingleObject(Server.NumberOfConnectedUsersMutex, INFINITE); // wait for Mutex access
 	if (WAIT_OBJECT_0 != wait_code) {
-		OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Custom message: Error in wait for NumberOfConnectedUsersMutex.\n");
+		WriteToLogFile(Server.LogFilePtr, "Custom message: Error in wait for NumberOfConnectedUsersMutex.\n");
 		CloseSocketsAndThreads(); // todo add/check print
 		exit(ERROR_CODE);
 	}
 	Server.NumberOfConnectedUsers++;
 	if (ReleaseOneSemaphore(Server.NumberOfConnectedUsersSemaphore) == FALSE) { // to signal to ConnectUsersThread
-		OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Custom message: failed to release NumberOfConnectedUsers semaphore.\n");
+		WriteToLogFile(Server.LogFilePtr, "Custom message: failed to release NumberOfConnectedUsers semaphore.\n");
 		CloseSocketsAndThreads(); // todo check if add function to handle error
 		exit(ERROR_CODE);
 	}
@@ -305,7 +317,7 @@ void UpdateNumberOfConnectedUsersAndWaitForGameStart() {
 		SignalGameStarted();
 		ret_val = ReleaseMutex(Server.NumberOfConnectedUsersMutex); // release mutex
 		if (FALSE == ret_val) {
-			OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Custom message: Error in releasing NumberOfConnectedUsersMutex.\n");
+			WriteToLogFile(Server.LogFilePtr, "Custom message: Error in releasing NumberOfConnectedUsersMutex.\n");
 			CloseSocketsAndThreads(); // todo add/check print
 			exit(ERROR_CODE);
 		}
@@ -313,7 +325,7 @@ void UpdateNumberOfConnectedUsersAndWaitForGameStart() {
 	else { // wait for one more user to connect
 		ret_val = ReleaseMutex(Server.NumberOfConnectedUsersMutex); // release mutex
 		if (FALSE == ret_val) {
-			OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Custom message: Error in releasing NumberOfConnectedUsersMutex.\n");
+			WriteToLogFile(Server.LogFilePtr, "Custom message: Error in releasing NumberOfConnectedUsersMutex.\n");
 			CloseSocketsAndThreads(); // todo add/check print
 			exit(ERROR_CODE);
 		}
@@ -325,7 +337,7 @@ void WaitForGameStartedSignal() {
 	DWORD wait_code;
 	wait_code = WaitForSingleObject(Server.GameStartedSemaphore, INFINITE); // wait for signal // todo check infinite - should change to 5 min?
 	if (WAIT_OBJECT_0 != wait_code) {
-		OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Custom message: Error when waiting for GameStarted semaphore.\n");
+		WriteToLogFile(Server.LogFilePtr, "Custom message: Error when waiting for GameStarted semaphore.\n");
 		CloseSocketsAndThreads(); // todo check how to handle error by instructions
 		exit(ERROR_CODE);
 	}
@@ -333,7 +345,7 @@ void WaitForGameStartedSignal() {
 
 void SignalGameStarted() {
 	if (ReleaseOneSemaphore(Server.GameStartedSemaphore) == FALSE) { // to signal that both clients connected
-		OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Custom message: SignalGameStarted - failed to release GameStarted semaphore.\n");
+		WriteToLogFile(Server.LogFilePtr, "Custom message: SignalGameStarted - failed to release GameStarted semaphore.\n");
 		CloseSocketsAndThreads(); // todo check if add function to handle error
 		exit(ERROR_CODE);
 	}
@@ -357,13 +369,12 @@ void SendBoardView(int ClientIndex) {
 	strcat(BoardMessage, "           | | | |\n");
 	int VerticalAxis = BOARD_SIZE - 1;
 	int HorizonalAxis;
-	int LineOffset = 12; // base offset of "BOARD_VIEW:|"
-	int LineLength = 18; // one line size
 	for (; VerticalAxis >= 0; VerticalAxis--) {
 		for (HorizonalAxis = 0; HorizonalAxis < BOARD_SIZE; HorizonalAxis++) {
 			if (Server.Board[VerticalAxis][HorizonalAxis] != None) {
 				CharToUpdate = Server.Board[VerticalAxis][HorizonalAxis] == X ? 'x' : 'o';
-				BoardMessage[LineLength*(BOARD_SIZE - 1 - VerticalAxis) + LineOffset + 2 * HorizonalAxis] = CharToUpdate;
+				BoardMessage[BOARD_MESSAGE_LINE_LENGTH*(BOARD_SIZE - 1 - VerticalAxis) +
+							 BOARD_MESSAGE_LINE_OFFSET + 2 * HorizonalAxis] = CharToUpdate;
 			}
 		}
 	}
@@ -373,6 +384,10 @@ void SendBoardView(int ClientIndex) {
 		CloseSocketsAndThreads();
 		exit(ERROR_CODE);
 	}
+	char TempMessage[MESSAGE_LENGTH];
+	sprintf(TempMessage, "Custom message: Sent BOARD_VIEW to Client %d, UserName %s.\n",
+						  ClientIndex, Server.Players[ClientIndex].UserName);
+	WriteToLogFile(Server.LogFilePtr, TempMessage);
 }
 
 void SendTurnSwitch(int ClientIndex) {
@@ -384,6 +399,37 @@ void SendTurnSwitch(int ClientIndex) {
 		CloseSocketsAndThreads();
 		exit(ERROR_CODE);
 	}
+	char TempMessage[MESSAGE_LENGTH];
+	sprintf(TempMessage, "Custom message: Sent TURN_SWITCH to Client %d, UserName %s.\n",
+						  ClientIndex, Server.Players[ClientIndex].UserName);
+	WriteToLogFile(Server.LogFilePtr, TempMessage);
+}
+
+void HandleReceivedData(char *ReceivedData, int ClientIndex) {
+	if (strstr(ReceivedData, "PLAY_REQUEST") == 0) {
+		HandlePlayRequest(ReceivedData); // todo
+	}
+	else if (strstr(ReceivedData, "USER_LIST_QUERY") == 0) {
+		HandleUserListQuery(); // todo
+	}
+	else {
+		WriteToLogFile(Server.LogFilePtr, "Custom message: Got unexpected answer from client. Exiting...\n");
+		free(ReceivedData);
+		CloseSocketsAndThreads();
+		exit(ERROR_CODE);
+	}
+	/*char TempMessage[MESSAGE_LENGTH];
+	sprintf(TempMessage, "Received from server: %s\n", ReceivedData);
+	WriteToLogFile(Server.LogFilePtr, TempMessage);*/
+	free(ReceivedData);
+}
+
+void HandlePlayRequest(char *ReceivedData) {
+
+}
+
+void HandleUserListQuery() {
+
 }
 
 void CloseSocketsAndThreads() {

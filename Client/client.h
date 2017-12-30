@@ -15,7 +15,7 @@ typedef struct ClientProperties {
 	HANDLE ThreadHandles[NUMBER_OF_THREADS_TO_HANDLE_CLIENT]; // one for send, one for receive, and one for user interface
 	DWORD ThreadIDs[NUMBER_OF_THREADS_TO_HANDLE_CLIENT]; // thread ids for the above thread handles
 
-	HANDLE ReceiveDataSemaphore; // semaphore for send data indication
+	HANDLE UserInterfaceSemaphore; // semaphore to block user interface thread until connection is established and user is accepted
 
 	PlayerType PlayerType;
 }ClientProperties;

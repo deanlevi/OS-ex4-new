@@ -9,8 +9,6 @@
 #define MINUTE_IN_MS 60000
 #define BINDING_SUCCEEDED 0
 #define LISTEN_SUCCEEDED 0
-#define USER_NAME_LENGTH 31
-#define BOARD_SIZE 3
 
 typedef struct _PlayerProperties {
 	char UserName[USER_NAME_LENGTH];

@@ -13,9 +13,13 @@ void CreateThreadsAndSemaphores();
 void WINAPI SendThread();
 void HandleNewUserRequest();
 void WINAPI ReceiveThread();
-void HandleNewUserAccept();
-void ParseNewUserAccept(char *ReceivedData);
 void HandleReceivedData(char *ReceivedData);
+void HandleNewUserAccept(char *ReceivedData);
+void HandleBoardView(char *ReceivedData);
+void HandleTurnSwitch(char *ReceivedData);
+void HandlePlayAccepted();
+void HandleGameEnded(char *ReceivedData);
+void HandleUserListReply();
 void WINAPI UserInterfaceThread();
 void CloseSocketAndThreads();
 
@@ -31,7 +35,7 @@ void InitClient(char *argv[]) {
 	for (; ThreadIndex < NUMBER_OF_THREADS_TO_HANDLE_CLIENT; ThreadIndex++) {
 		Client.ThreadHandles[ThreadIndex] = NULL;
 	}
-	Client.ReceiveDataSemaphore = NULL;
+	Client.UserInterfaceSemaphore = NULL;
 	Client.PlayerType = None;
 	InitLogFile(Client.LogFilePtr);
 }
@@ -44,7 +48,7 @@ void HandleClient() {
 	if (Client.Socket == INVALID_SOCKET) {
 		char ErrorMessage[MESSAGE_LENGTH];
 		sprintf(ErrorMessage, "Custom message: HandleClient failed to create socket.\nError Number is %d\n", WSAGetLastError());
-		OutputMessageToWindowAndLogFile(Client.LogFilePtr, ErrorMessage);
+		WriteToLogFile(Client.LogFilePtr, ErrorMessage);
 		exit(ERROR_CODE);
 	}
 
@@ -53,7 +57,7 @@ void HandleClient() {
 
 	wait_code = WaitForMultipleObjects(NUMBER_OF_THREADS_TO_HANDLE_CLIENT, Client.ThreadHandles, TRUE, INFINITE); // todo check INFINITE
 	if (WAIT_OBJECT_0 != wait_code) {
-		OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Custom message: Error when waiting for program to end.\n");
+		WriteToLogFile(Client.LogFilePtr, "Custom message: Error when waiting for program to end.\n");
 		CloseSocketAndThreads(); // todo add/check print
 		exit(ERROR_CODE);
 	}
@@ -69,8 +73,8 @@ void ConnectToServer() {
 
 	ConnectReturnValue = connect(Client.Socket, (SOCKADDR*)&Client.SocketService, sizeof(Client.SocketService));
 	if (ConnectReturnValue == SOCKET_ERROR) {
-		sprintf(ConnectMessage, "Failed connecting to server on %s:%d. Exiting.\n", Client.ServerIP, Client.ServerPortNum);
-		OutputMessageToWindowAndLogFile(Client.LogFilePtr, ConnectMessage);
+		sprintf(ConnectMessage, "Custom message: Failed connecting to server on %s:%d. Exiting.\n", Client.ServerIP, Client.ServerPortNum);
+		WriteToLogFile(Client.LogFilePtr, ConnectMessage);
 		CloseSocketAndThreads(); // todo check if add function to handle error
 		exit(ERROR_CODE);
 	}
@@ -95,20 +99,19 @@ void CreateThreadsAndSemaphores() {
 		Client.LogFilePtr);
 
 	if (Client.ThreadHandles[0] == NULL || Client.ThreadHandles[1] == NULL || Client.ThreadHandles[2] == NULL) {
-		OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Custom message: CreateThreadsAndSemaphores failed to create threads.\n");
+		WriteToLogFile(Client.LogFilePtr, "Custom message: CreateThreadsAndSemaphores failed to create threads.\n");
 		CloseSocketAndThreads(); // todo check if add function to handle error
 		exit(ERROR_CODE);
 	}
 
-	Client.ReceiveDataSemaphore = CreateSemaphore(
+	Client.UserInterfaceSemaphore = CreateSemaphore(
 		NULL,	/* Default security attributes */
 		0,		/* Initial Count - not signaled */
 		1,		/* Maximum Count */
 		NULL);	/* un-named */
 
-	if (Client.ReceiveDataSemaphore == NULL) {
-		OutputMessageToWindowAndLogFile(Client.LogFilePtr,
-			"Custom message: CreateThreadsAndSemaphores - Error when creating SendDataSemaphore semaphore.\n");
+	if (Client.UserInterfaceSemaphore == NULL) {
+		WriteToLogFile(Client.LogFilePtr, "Custom message: CreateThreadsAndSemaphores - Error when creating UserInterface semaphore.\n");
 		CloseSocketAndThreads(); // todo check if add function to handle error
 		exit(ERROR_CODE);
 	}
@@ -131,19 +134,11 @@ void HandleNewUserRequest() {
 		exit(ERROR_CODE);
 	}
 	char TempMessage[MESSAGE_LENGTH];
-	sprintf(TempMessage, "Custom message: Sent NEW_USER_REQUEST to Server. UserName %s.\n", Client.UserName);
-	OutputMessageToWindowAndLogFile(Client.LogFilePtr, TempMessage);
-
-	if (ReleaseOneSemaphore(Client.ReceiveDataSemaphore) == FALSE) { // to receive NEW_USER_ACCEPTED
-		OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Custom message: SendThread - failed to release receive semaphore.\n");
-		CloseSocketAndThreads(); // todo check if add function to handle error
-		exit(ERROR_CODE);
-	}
+	sprintf(TempMessage, "Sent to server: %s\n", NewUserRequest);
+	WriteToLogFile(Client.LogFilePtr, TempMessage);
 }
 
 void WINAPI ReceiveThread() {
-	HandleNewUserAccept();
-
 	while (TRUE) {
 		char *ReceivedData = ReceiveData(Client.Socket, Client.LogFilePtr);
 		if (ReceivedData == NULL) {
@@ -154,36 +149,44 @@ void WINAPI ReceiveThread() {
 	}
 }
 
-void HandleNewUserAccept() {
-	/*DWORD wait_code;
-		wait_code = WaitForSingleObject(Client.ReceiveDataSemaphore, INFINITE); // wait for signal // todo check if needed
-	if (WAIT_OBJECT_0 != wait_code) {
-		OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Custom message: Error when waiting for ReceiveData semaphore.\n");
-		CloseSocketAndThreads();
-		exit(ERROR_CODE);
-	}*/
-	char *ReceivedData = ReceiveData(Client.Socket, Client.LogFilePtr);
-	if (ReceivedData == NULL) {
+void HandleReceivedData(char *ReceivedData) {
+	if (strncmp(ReceivedData, "NEW_USER_ACCEPTED", 17) == 0 || strncmp(ReceivedData, "NEW_USER_DECLINED", 17) == 0) {
+		HandleNewUserAccept(ReceivedData);
+	}
+	else if (strstr(ReceivedData, "GAME_STARTED") == 0) {
+		OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Game is on!");
+	}
+	else if (strstr(ReceivedData, "BOARD_VIEW") == 0) {
+		HandleBoardView(ReceivedData);
+	}
+	else if (strstr(ReceivedData, "TURN_SWITCH") == 0) {
+		HandleTurnSwitch(ReceivedData);
+	}
+	else if (strstr(ReceivedData, "PLAY_ACCEPTED") == 0) {
+		HandlePlayAccepted(); // todo
+	}
+	else if (strstr(ReceivedData, "GAME_ENDED") == 0) {
+		HandleGameEnded(ReceivedData); // todo
+	}
+	else if (strstr(ReceivedData, "USER_LIST_REPLY") == 0) {
+		HandleUserListReply(); // todo
+	}
+	else {
+		WriteToLogFile(Client.LogFilePtr, "Custom message: Got unexpected answer from Server. Exiting...\n");
+		free(ReceivedData);
 		CloseSocketAndThreads();
 		exit(ERROR_CODE);
 	}
-	ParseNewUserAccept(ReceivedData);
 	char TempMessage[MESSAGE_LENGTH];
-	char PlayerType = Client.PlayerType == X ? 'x' : 'o';
-	sprintf(TempMessage, "Custom message: %s received NEW_USER_ACCEPTED from Server. PlayerType is %c.\n", Client.UserName, PlayerType);
-	OutputMessageToWindowAndLogFile(Client.LogFilePtr, TempMessage);
+	sprintf(TempMessage, "Received from server: %s\n", ReceivedData);
+	WriteToLogFile(Client.LogFilePtr, TempMessage);
+	free(ReceivedData);
 }
 
-void ParseNewUserAccept(char *ReceivedData) {
+void HandleNewUserAccept(char *ReceivedData) {
 	int NewUserMessageOffset = 17; // size of "NEW_USER_DECLINED" / "NEW_USER_ACCEPTED"
-	if (strncmp(ReceivedData, "NEW_USER_DECLINED", NewUserMessageOffset) == 0 ||
-		strncmp(ReceivedData, "NEW_USER_ACCEPTED", NewUserMessageOffset) != 0) {
-		if (strncmp(ReceivedData, "NEW_USER_DECLINED", NewUserMessageOffset) == 0) {
-			OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Request to join was refused.\n");
-		}
-		else {
-			OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Custom message: Got unexpected answer from Server. Exiting...\n");
-		}
+	if (strncmp(ReceivedData, "NEW_USER_DECLINED", NewUserMessageOffset) == 0) {
+		WriteToLogFile(Client.LogFilePtr, "Request to join was refused.\n");
 		free(ReceivedData);
 		CloseSocketAndThreads();
 		exit(ERROR_CODE);
@@ -195,22 +198,88 @@ void ParseNewUserAccept(char *ReceivedData) {
 		Client.PlayerType = O;
 	}
 	else {
-		OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Custom message: Got unexpected answer from Server. Exiting...\n");
+		WriteToLogFile(Client.LogFilePtr, "Custom message: Got unexpected answer from Server. Exiting...\n");
 		free(ReceivedData);
 		CloseSocketAndThreads();
 		exit(ERROR_CODE);
 	}
+	if (ReleaseOneSemaphore(Client.UserInterfaceSemaphore) == FALSE) { // to release UserInterface thread
+		WriteToLogFile(Client.LogFilePtr, "Custom message: SendThread - failed to release receive semaphore.\n");
+		CloseSocketAndThreads(); // todo check if add function to handle error
+		exit(ERROR_CODE);
+	}
 	// todo check if need to parse player number. 1/2.
-	free(ReceivedData);
 }
 
-void HandleReceivedData(char *ReceivedData) {
+void HandleBoardView(char *ReceivedData) {
+	char BoardMessage[MESSAGE_LENGTH];
+	int LineLength = 7; // size of "| | | |"
+	int LineIndex = 0;
+	for (; LineIndex < BOARD_SIZE; LineIndex++) { // build message
+		strncpy(BoardMessage, ReceivedData + BOARD_MESSAGE_LINE_OFFSET +
+			   (BOARD_MESSAGE_LINE_LENGTH + 1)*LineIndex, LineLength); // + 1 for '\n'
+		strncat(BoardMessage, "\n", 1); // add '\n'
+	}
+	printf("%s", BoardMessage);
+}
+
+void HandleTurnSwitch(char *ReceivedData) {
+	char TurnSwitchMessage[MESSAGE_LENGTH];
+	char UserName[USER_NAME_LENGTH];
+	int UserNameStartPosition = 12; // size of "TURN_SWITCH:"
+	int UserNameEndPosition = UserNameStartPosition;
+	while (ReceivedData[UserNameEndPosition] != ';') {
+		UserNameEndPosition++;
+	}
+	int UserNameLength = UserNameEndPosition - UserNameStartPosition;
+	strncpy(UserName, ReceivedData + UserNameStartPosition, UserNameLength);
+	char Symbol = ReceivedData[UserNameEndPosition + 1];
+	sprintf(TurnSwitchMessage, "%s's turn (%c)", UserName, Symbol);
+	OutputMessageToWindowAndLogFile(Client.LogFilePtr, TurnSwitchMessage);
+}
+
+void HandlePlayAccepted() {
+
+}
+
+void HandleGameEnded(char *ReceivedData) {
+	int ParameterStartPosition = 11; // size of "GAME_ENDED:"
+	if (strncmp(ReceivedData + ParameterStartPosition, "Tie", 3) == 0) { // todo verify structure
+		OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Game ended. Everybody wins!\n");
+	}
+	else {
+		char GameEndedMessage[MESSAGE_LENGTH];
+		char UserName[USER_NAME_LENGTH];
+		int ParameterEndPosition = ParameterStartPosition;
+		while (ReceivedData[ParameterEndPosition] != '\n') {
+			ParameterEndPosition++;
+		}
+		strncpy(UserName, ReceivedData + ParameterStartPosition, ParameterEndPosition - ParameterStartPosition);
+		sprintf(GameEndedMessage, "Game ended. The winner is %s!", UserName);
+		OutputMessageToWindowAndLogFile(Client.LogFilePtr, GameEndedMessage);
+	}
+	// todo handle close connection
+}
+
+void HandleUserListReply() {
 
 }
 
 void WINAPI UserInterfaceThread() {
+	WaitForUserInterfaceSemaphore();
 	while (TRUE) {
 		break; // todo remove
+	}
+}
+
+void WaitForUserInterfaceSemaphore() {
+	DWORD wait_code;
+
+	wait_code = WaitForSingleObject(Client.UserInterfaceSemaphore, INFINITE); // wait for connection to be established and user accepted
+	if (WAIT_OBJECT_0 != wait_code) {
+		WriteToLogFile(Client.LogFilePtr, "Custom message: SendThread - failed to wait for  UserInterface semaphore.\n");
+		CloseSocketAndThreads(); // todo check if add function to handle error
+		exit(ERROR_CODE);
 	}
 }
 
@@ -220,5 +289,6 @@ void CloseSocketAndThreads() { // todo
 	for (; ThreadIndex < NUMBER_OF_THREADS_TO_HANDLE_CLIENT; ThreadIndex++) {
 		CloseOneThreadHandle(Client.ThreadHandles[ThreadIndex], Client.LogFilePtr);
 	}
+	CloseOneThreadHandle(Client.UserInterfaceSemaphore, Client.LogFilePtr);
 	CloseWsaData(Client.LogFilePtr);
 }

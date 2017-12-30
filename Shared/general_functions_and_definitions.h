@@ -14,6 +14,10 @@
 #define SUCCESS_CODE (int)(0) // todo move to shared
 #define ERROR_CODE (int)(-1) // todo move to shared
 #define MESSAGE_LENGTH 100
+#define USER_NAME_LENGTH 31
+#define BOARD_SIZE 3
+#define BOARD_MESSAGE_LINE_OFFSET 12
+#define BOARD_MESSAGE_LINE_LENGTH 18
 
 typedef enum _PlayerType {
 	None,
