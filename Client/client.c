@@ -120,7 +120,15 @@ void WINAPI SendThread() {
 		CloseSocketAndThreads();
 		exit(ERROR_CODE);
 	}
-	ReleaseOneSemaphore(Client.ReceiveDataSemaphore); // to receive NEW_USER_ACCEPTED
+	char TempMessage[MESSAGE_LENGTH];
+	sprintf(TempMessage, "Custom message: Sent NEW_USER_REQUEST to Server. UserName %s.\n", Client.UserName);
+	OutputMessageToWindowAndLogFile(Client.LogFilePtr, TempMessage);
+
+	if (ReleaseOneSemaphore(Client.ReceiveDataSemaphore) == FALSE) { // to receive NEW_USER_ACCEPTED
+		OutputMessageToWindowAndLogFile(Client.LogFilePtr, "Custom message: SendThread - failed to release receive semaphore.\n");
+		CloseSocketAndThreads(); // todo check if add function to handle error
+		exit(ERROR_CODE);
+	}
 	while (TRUE) {
 		break; // todo remove
 	}
@@ -140,6 +148,11 @@ void WINAPI ReceiveThread() {
 		exit(ERROR_CODE);
 	}
 	ParseNewUserAccept(ReceivedData);
+	char TempMessage[MESSAGE_LENGTH];
+	char PlayerType = Client.PlayerType == X ? 'x' : 'o';
+	sprintf(TempMessage, "Custom message: %s received NEW_USER_ACCEPTED from Server. PlayerType is %c.\n", Client.UserName, PlayerType);
+	OutputMessageToWindowAndLogFile(Client.LogFilePtr, TempMessage);
+
 	while (TRUE) {
 		break; // todo remove
 	}

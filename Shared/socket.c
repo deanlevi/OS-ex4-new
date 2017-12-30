@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+
 #include "socket.h"
 
 SOCKET CreateOneSocket();
@@ -47,8 +48,9 @@ char *ReceiveData(SOCKET Socket, char *LogFilePathPtr) {
 		OutputMessageToWindowAndLogFile(LogFilePathPtr, "Custom message: ReceiveData failed to allocate memory.\n");
 		return NULL;
 	}
+	WholeReceivedBuffer[IndexInWholeReceivedBuffers] = '\0'; // so that strstr will work
 
-	while (strstr(WholeReceivedBuffer, '\n') == NULL) {
+	while (strstr(WholeReceivedBuffer, "\n") == NULL) {
 		ReceivedBytes = recv(Socket, CurrentReceivedBuffer, MESSAGE_LENGTH, SEND_RECEIVE_FLAGS);
 		if (ReceivedBytes == SOCKET_ERROR) {
 			OutputMessageToWindowAndLogFile(LogFilePathPtr, "Custom message: ReceiveAndSendData failed to recv. Exiting...\n");
@@ -64,8 +66,8 @@ char *ReceiveData(SOCKET Socket, char *LogFilePathPtr) {
 				return NULL;
 			}
 		}
+		strncat(WholeReceivedBuffer, CurrentReceivedBuffer, ReceivedBytes);
 		IndexInWholeReceivedBuffers += ReceivedBytes;
-		strcat(WholeReceivedBuffer, CurrentReceivedBuffer);
 	}
 	return WholeReceivedBuffer;
 }
@@ -76,7 +78,7 @@ void CloseOneSocket(SOCKET Socket, char *LogFilePathPtr) {
 		CloseSocketReturnValue = closesocket(Socket);
 		if (CloseSocketReturnValue == SOCKET_ERROR) {
 			char ErrorMessage[MESSAGE_LENGTH];
-			sprintf(ErrorMessage, "Custom message: CloseOneSocket failed to close socket.\nError Number is %d\n", WSAGetLastError());
+			sprintf(ErrorMessage, "Custom message: CloseOneSocket failed to close socket. Error Number is %d\n", WSAGetLastError());
 			OutputMessageToWindowAndLogFile(LogFilePathPtr, ErrorMessage);
 			exit(ERROR_CODE);
 		}

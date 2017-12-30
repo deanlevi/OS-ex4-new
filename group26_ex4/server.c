@@ -40,7 +40,7 @@ void CreateSocketBindAndListen() {
 	Server.ListeningSocket = CreateOneSocket();
 	if (Server.ListeningSocket == INVALID_SOCKET) {
 		char ErrorMessage[MESSAGE_LENGTH];
-		sprintf(ErrorMessage, "Custom message: CreateSocketBindAndListen failed to create socket.\nError Number is %d\n", WSAGetLastError());
+		sprintf(ErrorMessage, "Custom message: CreateSocketBindAndListen failed to create socket. Error Number is %d\n", WSAGetLastError());
 		OutputMessageToWindowAndLogFile(Server.LogFilePtr, ErrorMessage);
 		exit(ERROR_CODE);
 	}
@@ -68,7 +68,7 @@ void SetSocketToListen() {
 	ListenReturnValue = listen(Server.ListeningSocket, NUMBER_OF_CLIENTS); // todo check NUMBER_OF_CLIENTS
 	if (ListenReturnValue != LISTEN_SUCCEEDED) {
 		char ErrorMessage[MESSAGE_LENGTH];
-		sprintf(ErrorMessage, "Custom message: SetSocketToListen failed to set Socket to listen.\n Error Number is %d\n", WSAGetLastError());
+		sprintf(ErrorMessage, "Custom message: SetSocketToListen failed to set Socket to listen. Error Number is %d\n", WSAGetLastError());
 		OutputMessageToWindowAndLogFile(Server.LogFilePtr, ErrorMessage);
 		CloseSocketsAndThreads(); // todo add/check print
 		exit(ERROR_CODE);
@@ -83,7 +83,7 @@ void ConnectToClientsAndRunGame() { // todo add support for more than one game /
 			Server.ClientsSockets[ClientIndex] = accept(Server.ListeningSocket, NULL, NULL); // todo check NULL, NULL
 			if (Server.ClientsSockets[ClientIndex] == INVALID_SOCKET) {
 				char ErrorMessage[MESSAGE_LENGTH];
-				sprintf(ErrorMessage, "Custom message: ConnectToClients failed to accept.\n Error Number is %d\n", WSAGetLastError());
+				sprintf(ErrorMessage, "Custom message: ConnectToClients failed to accept. Error Number is %d\n", WSAGetLastError());
 				OutputMessageToWindowAndLogFile(Server.LogFilePtr, ErrorMessage);
 				CloseSocketsAndThreads(); // todo add/check print
 				exit(ERROR_CODE);
@@ -127,7 +127,10 @@ void WINAPI TicTacToeGameThread(LPVOID lpParam) {
 		CloseSocketsAndThreads();
 		exit(ERROR_CODE);
 	}
-
+	char TempMessage[MESSAGE_LENGTH];
+	sprintf(TempMessage, "Custom message: Sent NEW_USER_ACCEPTED to Client %d, UserName %s.\n",
+						  *ClientIndex, Server.Players[*ClientIndex].UserName);
+	OutputMessageToWindowAndLogFile(Server.LogFilePtr, TempMessage);
 }
 
 void ParseNewUserRequest(char *ReceivedData, int ClientIndex) {
@@ -138,7 +141,7 @@ void ParseNewUserRequest(char *ReceivedData, int ClientIndex) {
 		EndPosition++;
 	}
 	ParameterSize = (EndPosition - 1) - StartPosition + 1;
-	if (strncmp(ReceiveData, "NEW_USER_REQUEST", ParameterSize) != 0) {
+	if (strncmp(ReceivedData, "NEW_USER_REQUEST", ParameterSize) != 0) {
 		char ErrorMessage[MESSAGE_LENGTH];
 		sprintf(ErrorMessage, "Custom message: Got unexpected data from client number %d. Exiting...\n", ClientIndex);
 		OutputMessageToWindowAndLogFile(Server.LogFilePtr, ErrorMessage);
@@ -152,9 +155,13 @@ void ParseNewUserRequest(char *ReceivedData, int ClientIndex) {
 		EndPosition++;
 	}
 	ParameterSize = (EndPosition - 1) - StartPosition + 1;
-	strncpy(ReceivedData + StartPosition, Server.Players[ClientIndex].UserName, ParameterSize);
+	strncpy(Server.Players[ClientIndex].UserName, ReceivedData + StartPosition, ParameterSize);
 	Server.Players[ClientIndex].UserName[EndPosition] = '\0';
 	free(ReceivedData);
+	char TempMessage[MESSAGE_LENGTH];
+	sprintf(TempMessage, "Custom message: Received NEW_USER_REQUEST from Client %d, UserName %s.\n",
+						  ClientIndex, Server.Players[ClientIndex].UserName);
+	OutputMessageToWindowAndLogFile(Server.LogFilePtr, TempMessage);
 }
 
 void CloseSocketsAndThreads() {
