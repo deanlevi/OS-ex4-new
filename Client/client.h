@@ -4,6 +4,7 @@
 #include "../Shared/socket.h" // todo
 
 #define NUMBER_OF_THREADS_TO_HANDLE_CLIENT 3
+#define USER_INPUT_LENGTH 20 // todo check
 
 typedef struct ClientProperties {
 	SOCKET Socket; // the socket that is connecting to the server
@@ -16,8 +17,10 @@ typedef struct ClientProperties {
 	DWORD ThreadIDs[NUMBER_OF_THREADS_TO_HANDLE_CLIENT]; // thread ids for the above thread handles
 
 	HANDLE UserInterfaceSemaphore; // semaphore to block user interface thread until connection is established and user is accepted
+	HANDLE SendToServerSemaphore; // semaphore to signal each time a new message to send to server is available
 
 	PlayerType PlayerType;
+	char MessageToSendToServer[MESSAGE_LENGTH]; // each time SendToServerSemaphore is signaled contains the message to send
 }ClientProperties;
 
 ClientProperties Client;

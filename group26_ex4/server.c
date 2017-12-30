@@ -185,11 +185,11 @@ void WINAPI ConnectToClientsThread(LPVOID lpParam) { // todo add support for mor
 }
 
 void InitBoard() {
-	int VerticalAxis = 0;
-	int HorizonalAxis = 0;
-	for (; VerticalAxis < BOARD_SIZE; VerticalAxis++) {
-		for (; HorizonalAxis < BOARD_SIZE; HorizonalAxis++) {
-			Server.Board[VerticalAxis][HorizonalAxis] = None;
+	int ColumnNum = 0;
+	int RowNum = 0;
+	for (; RowNum < BOARD_SIZE; RowNum++) {
+		for (; ColumnNum < BOARD_SIZE; ColumnNum++) {
+			Server.Board[RowNum][ColumnNum] = None;
 		}
 	}
 }
@@ -367,14 +367,14 @@ void SendBoardView(int ClientIndex) {
 	strcpy(BoardMessage, "BOARD_VIEW:| | | |");
 	strcat(BoardMessage, "           | | | |");
 	strcat(BoardMessage, "           | | | |\n");
-	int VerticalAxis = BOARD_SIZE - 1;
-	int HorizonalAxis;
-	for (; VerticalAxis >= 0; VerticalAxis--) {
-		for (HorizonalAxis = 0; HorizonalAxis < BOARD_SIZE; HorizonalAxis++) {
-			if (Server.Board[VerticalAxis][HorizonalAxis] != None) {
-				CharToUpdate = Server.Board[VerticalAxis][HorizonalAxis] == X ? 'x' : 'o';
-				BoardMessage[BOARD_MESSAGE_LINE_LENGTH*(BOARD_SIZE - 1 - VerticalAxis) +
-							 BOARD_MESSAGE_LINE_OFFSET + 2 * HorizonalAxis] = CharToUpdate;
+	int ColumnNum = BOARD_SIZE - 1;
+	int RowNum;
+	for (; ColumnNum >= 0; ColumnNum--) {
+		for (RowNum = 0; RowNum < BOARD_SIZE; RowNum++) {
+			if (Server.Board[RowNum][ColumnNum] != None) {
+				CharToUpdate = Server.Board[RowNum][ColumnNum] == X ? 'x' : 'o';
+				BoardMessage[BOARD_MESSAGE_LINE_LENGTH*(BOARD_SIZE - 1 - ColumnNum) +
+							 BOARD_MESSAGE_LINE_OFFSET + 2 * RowNum] = CharToUpdate;
 			}
 		}
 	}
@@ -411,6 +411,12 @@ void HandleReceivedData(char *ReceivedData, int ClientIndex) {
 	}
 	else if (strstr(ReceivedData, "USER_LIST_QUERY") == 0) {
 		HandleUserListQuery(); // todo
+	}
+	else if (strstr(ReceivedData, "GAME_STATE_QUERY") == 0) { // todo - not in the instruction list !!
+		//HandleGameStateQuery(); // todo
+	}
+	else if (strstr(ReceivedData, "BOARD_VIEW_QUERY") == 0) { // todo - not in the instruction list !!
+		//SendBoardView(ClientIndex); // todo
 	}
 	else {
 		WriteToLogFile(Server.LogFilePtr, "Custom message: Got unexpected answer from client. Exiting...\n");

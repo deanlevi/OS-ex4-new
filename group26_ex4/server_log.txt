@@ -5,3 +5,4 @@ Custom message: Sent NEW_USER_ACCEPTED to Client 1, UserName isp_student2.
 Custom message: Sent BOARD_VIEW to Client 1, UserName isp_student2.
 Custom message: Sent BOARD_VIEW to Client 0, UserName isp_student.
 Custom message: Sent TURN_SWITCH to Client 1, UserName isp_student2.
+Custom message: Sent TURN_SWITCH to Client 0, UserName isp_student.
