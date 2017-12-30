@@ -3,6 +3,8 @@
 
 #include "../Shared/socket.h" // todo
 
+#define NUMBER_OF_THREADS_TO_HANDLE_CLIENT 3
+
 typedef struct ClientProperties {
 	SOCKET Socket; // the socket that is connecting to the server
 	SOCKADDR_IN SocketService;
@@ -10,13 +12,12 @@ typedef struct ClientProperties {
 	char *ServerIP; // server's IP
 	int ServerPortNum; // server's port num
 	char *UserName; // todo why need to assume <= 30 ?
-	HANDLE SendThreadHandle; // thread handle to send data to server
-	DWORD SendThreadID; // thread id for the above thread handle
-	HANDLE ReceiveThreadHandle; // thread handle to receive data to server
-	DWORD ReceiveThreadID; // thread id for the above thread handle
-	HANDLE UserInterfaceThreadHandle; // thread handle to communicate with client user
-	DWORD UserInterfaceThreadID; // thread id for the above thread handle
-	
+	HANDLE ThreadHandles[NUMBER_OF_THREADS_TO_HANDLE_CLIENT]; // one for send, one for receive, and one for user interface
+	DWORD ThreadIDs[NUMBER_OF_THREADS_TO_HANDLE_CLIENT]; // thread ids for the above thread handles
+
+	HANDLE ReceiveDataSemaphore; // semaphore for send data indication
+
+	PlayerType PlayerType;
 }ClientProperties;
 
 ClientProperties Client;

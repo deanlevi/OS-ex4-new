@@ -3,7 +3,11 @@
 
 #include "general_functions_and_definitions.h"
 
-SOCKET CreateOneSocket(); // todo fix function
-void CloseOneSocket(SOCKET Socket);
+#define SEND_RECEIVE_FLAGS 0
+
+SOCKET CreateOneSocket();
+int SendData(SOCKET Socket, char *DataToSend, char *LogFilePathPtr);
+char *ReceiveData(SOCKET Socket, char *LogFilePathPtr);
+void CloseOneSocket(SOCKET Socket, char *LogFilePathPtr);
 
 #endif

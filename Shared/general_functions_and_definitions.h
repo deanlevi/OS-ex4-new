@@ -15,12 +15,19 @@
 #define ERROR_CODE (int)(-1) // todo move to shared
 #define MESSAGE_LENGTH 100
 
+typedef enum _PlayerType {
+	None,
+	X,
+	O
+}PlayerType;
+
 void InitWsaData();
 void InitLogFile(char *LogFilePathPtr);
 void OutputMessageToWindowAndLogFile(char *LogFilePathPtr, char *MessageToWrite);
 void WriteToLogFile(char *LogFilePathPtr, char *MessageToWrite);
 HANDLE CreateThreadSimple(LPTHREAD_START_ROUTINE p_start_routine, LPVOID p_thread_parameters, LPDWORD p_thread_id,
 						  char *LogFilePathPtr);
+BOOL ReleaseOneSemaphore(HANDLE Semaphore);
 void CloseOneThreadHandle(HANDLE HandleToClose, char *LogFilePathPtr);
 void CloseWsaData(char *LogFilePathPtr);
 

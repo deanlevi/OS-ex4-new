@@ -1,4 +1,5 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 
 #include <stdio.h> // todo remove if removing printf
 #include <stdlib.h>
@@ -11,7 +12,8 @@ void CreateSocketBindAndListen();
 void SetSockAddrInAndBind();
 void SetSocketToListen();
 void ConnectToClientsAndRunGame();
-void WINAPI TicTacToeGame(LPVOID lpParam);
+void WINAPI TicTacToeGameThread(LPVOID lpParam);
+void ParseNewUserRequest(char *ReceivedData, int ClientIndex);
 void CloseSocketsAndThreads();
 
 void InitServer(char *argv[]) {
@@ -21,6 +23,7 @@ void InitServer(char *argv[]) {
 		Server.ClientsSockets[ClientIndex] = INVALID_SOCKET;
 		Server.ClientsThreadHandle[ClientIndex] = NULL;
 		Server.ClientIndex[ClientIndex] = ClientIndex;
+		Server.Players[ClientIndex].PlayerType = None;
 	}
 	Server.LogFilePtr = argv[1];
 	Server.PortNum = atoi(argv[2]);
@@ -35,6 +38,13 @@ void HandleServer() {
 void CreateSocketBindAndListen() {
 	InitWsaData();
 	Server.ListeningSocket = CreateOneSocket();
+	if (Server.ListeningSocket == INVALID_SOCKET) {
+		char ErrorMessage[MESSAGE_LENGTH];
+		sprintf(ErrorMessage, "Custom message: CreateSocketBindAndListen failed to create socket.\nError Number is %d\n", WSAGetLastError());
+		OutputMessageToWindowAndLogFile(Server.LogFilePtr, ErrorMessage);
+		exit(ERROR_CODE);
+	}
+
 	SetSockAddrInAndBind();
 	SetSocketToListen();
 }
@@ -78,29 +88,82 @@ void ConnectToClientsAndRunGame() { // todo add support for more than one game /
 				CloseSocketsAndThreads(); // todo add/check print
 				exit(ERROR_CODE);
 			}
-			Server.ClientsThreadHandle[ClientIndex] = CreateThreadSimple((LPTHREAD_START_ROUTINE)TicTacToeGame,
+			Server.ClientsThreadHandle[ClientIndex] = CreateThreadSimple((LPTHREAD_START_ROUTINE)TicTacToeGameThread,
 																		 &Server.ClientIndex[ClientIndex],
 																		 &Server.ClientsThreadID[ClientIndex],
 																		 Server.LogFilePtr);
+			if (Server.ClientsThreadHandle[ClientIndex] == NULL) {
+				CloseSocketsAndThreads(); // todo check if add function to handle error
+				exit(ERROR_CODE);
+			}
 		}
 	}
 }
 
-void WINAPI TicTacToeGame(LPVOID lpParam) {
+void WINAPI TicTacToeGameThread(LPVOID lpParam) {
 	if (NULL == lpParam) {
 		OutputMessageToWindowAndLogFile(Server.LogFilePtr, "Custom message: Error in TicTacToeGame. Received null pointer.\n");
+		CloseSocketsAndThreads(); // todo add/check print
+		exit(ERROR_CODE);
 	}
-	int *ClientIndexPointer = (int*)lpParam;
+	int *ClientIndex = (int*)lpParam;
+	char *ReceivedData = ReceiveData(Server.ClientsSockets[*ClientIndex], Server.LogFilePtr);
+	if (ReceivedData == NULL) {
+		CloseSocketsAndThreads();
+		exit(ERROR_CODE);
+	}
+	ParseNewUserRequest(ReceivedData, *ClientIndex);
+	Server.Players[*ClientIndex].PlayerType = *ClientIndex == 0 ? X : O;
+	char NewUserAcceptedMessage[MESSAGE_LENGTH];
+	if (Server.Players[*ClientIndex].PlayerType == X) {
+		sprintf(NewUserAcceptedMessage, "NEW_USER_ACCEPTED:x;1");
+	}
+	else {
+		sprintf(NewUserAcceptedMessage, "NEW_USER_ACCEPTED:o;2");
+	}
+	int SendDataToServerReturnValue;
+	SendDataToServerReturnValue = SendData(Server.ClientsSockets[*ClientIndex], NewUserAcceptedMessage, Server.LogFilePtr);
+	if (SendDataToServerReturnValue == ERROR_CODE) {
+		CloseSocketsAndThreads();
+		exit(ERROR_CODE);
+	}
 
+}
+
+void ParseNewUserRequest(char *ReceivedData, int ClientIndex) {
+	int StartPosition = 0;
+	int EndPosition = 0;
+	int ParameterSize;
+	while (ReceivedData[EndPosition] != ':') { // assuming valid input
+		EndPosition++;
+	}
+	ParameterSize = (EndPosition - 1) - StartPosition + 1;
+	if (strncmp(ReceiveData, "NEW_USER_REQUEST", ParameterSize) != 0) {
+		char ErrorMessage[MESSAGE_LENGTH];
+		sprintf(ErrorMessage, "Custom message: Got unexpected data from client number %d. Exiting...\n", ClientIndex);
+		OutputMessageToWindowAndLogFile(Server.LogFilePtr, ErrorMessage);
+		free(ReceivedData);
+		CloseSocketsAndThreads();
+		exit(ERROR_CODE);
+	}
+	EndPosition++;
+	StartPosition = EndPosition;
+	while (ReceivedData[EndPosition] != '\n') { // assuming valid input
+		EndPosition++;
+	}
+	ParameterSize = (EndPosition - 1) - StartPosition + 1;
+	strncpy(ReceivedData + StartPosition, Server.Players[ClientIndex].UserName, ParameterSize);
+	Server.Players[ClientIndex].UserName[EndPosition] = '\0';
+	free(ReceivedData);
 }
 
 void CloseSocketsAndThreads() {
 	int ClientIndex = 0;
 	DWORD ret_val;
 	for (; ClientIndex < NUMBER_OF_CLIENTS; ClientIndex++) {
-		CloseOneSocket(Server.ClientsSockets[ClientIndex]);
+		CloseOneSocket(Server.ClientsSockets[ClientIndex], Server.LogFilePtr);
 		CloseOneThreadHandle(Server.ClientsThreadHandle[ClientIndex], Server.LogFilePtr);
 	}
-	CloseOneSocket(Server.ListeningSocket);
+	CloseOneSocket(Server.ListeningSocket, Server.LogFilePtr);
 	CloseWsaData(Server.LogFilePtr);
 }

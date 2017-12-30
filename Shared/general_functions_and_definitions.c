@@ -11,6 +11,7 @@ void OutputMessageToWindowAndLogFile(char *LogFilePathPtr, char *MessageToWrite)
 void WriteToLogFile(char *LogFilePathPtr, char *MessageToWrite);
 HANDLE CreateThreadSimple(LPTHREAD_START_ROUTINE p_start_routine, LPVOID p_thread_parameters, LPDWORD p_thread_id,
 						  char *LogFilePathPtr);
+BOOL ReleaseOneSemaphore(HANDLE Semaphore);
 void CloseOneThreadHandle(HANDLE HandleToClose, char *LogFilePathPtr);
 void CloseWsaData(char *LogFilePathPtr);
 
@@ -55,14 +56,12 @@ HANDLE CreateThreadSimple(LPTHREAD_START_ROUTINE p_start_routine, LPVOID p_threa
 
 	if (NULL == p_start_routine) {
 		OutputMessageToWindowAndLogFile(LogFilePathPtr, "Error when creating a thread. Received null pointer.\n");
-		CloseSocketsAndThreads(); // todo check if add function to handle error
-		exit(ERROR_CODE);
+		return NULL;
 	}
 
 	if (NULL == p_thread_id) {
 		OutputMessageToWindowAndLogFile(LogFilePathPtr, "Error when creating a thread. Received null pointer.\n");
-		CloseSocketsAndThreads(); // todo check if add function to handle error
-		exit(ERROR_CODE);
+		return NULL;
 	}
 
 	thread_handle = CreateThread(
@@ -75,20 +74,30 @@ HANDLE CreateThreadSimple(LPTHREAD_START_ROUTINE p_start_routine, LPVOID p_threa
 
 	if (NULL == thread_handle) {
 		OutputMessageToWindowAndLogFile(LogFilePathPtr, "Couldn't create thread.\n");
-		CloseSocketsAndThreads(); // todo check if add function to handle error
-		exit(ERROR_CODE);
+		return NULL;
 	}
 
 	return thread_handle;
 }
 
+BOOL ReleaseOneSemaphore(HANDLE Semaphore) {
+	BOOL release_res;
+
+	release_res = ReleaseSemaphore(
+		Semaphore,
+		1,
+		NULL);
+	return release_res;
+}
+
 void CloseOneThreadHandle(HANDLE HandleToClose, char *LogFilePathPtr) {
 	DWORD ret_val;
-
-	ret_val = CloseHandle(HandleToClose);
-	if (FALSE == ret_val) {
-		OutputMessageToWindowAndLogFile(LogFilePathPtr, "Error when closing threads.\n");
-		exit(ERROR_CODE);
+	if (HandleToClose != NULL) {
+		ret_val = CloseHandle(HandleToClose);
+		if (FALSE == ret_val) {
+			OutputMessageToWindowAndLogFile(LogFilePathPtr, "Error when closing threads.\n");
+			exit(ERROR_CODE);
+		}
 	}
 }
 
